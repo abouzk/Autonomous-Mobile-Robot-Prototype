@@ -105,34 +105,54 @@ void leftEncoder() {
 }
 
 void driveForward(float distance) {
-  // unsigned int target_count = distance * ticks_per_meter;
-  // while(r_pos < target_count && l_pos < target_count){ 
-  //   float Kp = 2.0;                                                // Proportional gain for feedback control
-  //   int targetSpeed = 220;                                         // Target PWM value for both motors
-  //   int error = r_pos - l_pos;                                     // Calculate the error between the encoders
-  //   int rightSpeed = constrain(targetSpeed - Kp * error, 0, 255);  // Adjust right motor speed
-  //   int leftSpeed = constrain(targetSpeed + Kp * error, 0, 255);   // Adjust left motor speed
+  // Convert meters to encoder ticks
+  long target_ticks = distance * encoder_ticks_per_meter; 
+  
+  // Reset counters before starting a new segment to avoid accumulated drift errors
+  r_pos = 0; 
+  l_pos = 0;
 
-    // Drive the motors with feedback control
-    digitalWrite(IN1, HIGH);  // Forward right
+  // Control Constants
+  float Kp = 5.0;       // Proportional Gain (Tune this: Higher = Stronger Correction)
+  int baseSpeed = 200;  // Base PWM speed (0-255)
+
+  // Loop until we reach the target distance
+  // (Using average of both wheels for distance termination)
+  while ((abs(r_pos) + abs(l_pos)) / 2 < target_ticks) {
+    
+    // SAFETY CHECK: Subsumption Architecture
+    // Check obstacle BEFORE driving. If blocked, this function pauses motors inside checkObstacle()
+    checkObstacle(); 
+
+    // PROPORTIONAL CONTROLLER
+    // Calculate error: Positive means Right is ahead, Negative means Left is ahead
+    int error = abs(r_pos) - abs(l_pos); 
+
+    // Adjust speeds: If Right is ahead (error > 0), Right slows down, Left speeds up
+    int rightSpeed = baseSpeed - (Kp * error);
+    int leftSpeed = baseSpeed + (Kp * error);
+
+    // Clamp values to valid PWM range (0-255)
+    rightSpeed = constrain(rightSpeed, 0, 255);
+    leftSpeed = constrain(leftSpeed, 0, 255);
+
+    // Apply to motors
+    digitalWrite(IN1, HIGH);  // Forward Right
     digitalWrite(IN2, LOW);
-    analogWrite(ENA, 236);
+    analogWrite(ENA, rightSpeed);
 
-    digitalWrite(IN3, HIGH);  // Forward left
+    digitalWrite(IN3, HIGH);  // Forward Left
     digitalWrite(IN4, LOW);
-    analogWrite(ENB, 240);
-    Serial.print(r_pos);
-    Serial.print(", l_pos: ");
-    Serial.println(l_pos);
-    while((r_pos < encoder_ticks_per_meter*distance) && (l_pos < encoder_ticks_per_meter*distance)){
-      checkObstacle();
-      
-      Serial.print("Right: ");
-      Serial.print(r_pos);
-      Serial.print("      Left: ");
-      Serial.println(l_pos);
-    }
-    stopMotors();
+    analogWrite(ENB, leftSpeed);
+
+    // Debugging Telemetry
+    Serial.print("Target: "); Serial.print(target_ticks);
+    Serial.print(" | R: "); Serial.print(r_pos);
+    Serial.print(" | L: "); Serial.print(l_pos);
+    Serial.print(" | Err: "); Serial.println(error);
+  }
+
+  stopMotors(); // Done
 }
 
 void turn(int degrees) {
