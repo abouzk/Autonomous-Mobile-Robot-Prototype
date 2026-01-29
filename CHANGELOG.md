@@ -1,6 +1,6 @@
 # Changelog
 
-## [Current Build] - Portfolio Cleanup & Fixes
+## Portfolio Cleanup & Fixes
 Resurrected this project to document the architecture and clean up the code for my portfolio.
 
 ### Fixes
